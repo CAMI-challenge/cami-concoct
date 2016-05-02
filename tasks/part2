@@ -1,0 +1,59 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+
+# default settings
+#-----------------
+
+#KMER=31 #31
+#MINIMIZER=16 #16
+#REFDATA_DIR=$CONT_DATABASES_DIR/PROCESSED_NCBI
+#TAXONOMY=ncbi-taxonomy_20150130.tar.gz
+#REFDATA=refseq/complete.fna.gz
+#GI_TO_TAXID=refseq/complete.fna.gi_acc_tax.tsv.gz
+
+CONTIGS=$DCKR_CACHEDIR/contigs.fa
+CONTIGS_10K=$DCKR_CACHEDIR/contigs_10k.fa
+READS_R1=$DCKR_CACHEDIR/readsR1.fq
+READS_R2=$DCKR_CACHEDIR/readsR2.fq
+MAPPING_FOLDER=$DCKR_CACHEDIR/map
+CONCOCT_INPUT=$DCKR_CACHEDIR/con_in
+CONCOCT_OUTPUT=$DCKR_CACHEDIR/con_out
+SAMPLENAMES=$DCKR_CACHEDIR/sample_names.txt
+
+
+echo "generate coverage table"
+# generate coverage table
+	echo "Sample" > $SAMPLENAMES
+
+	#echo "$CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K" $($MAPPING_FOLDER/*/bowtie2/asm_pair-smds.coverage) 
+
+	python $CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/Sample/bowtie2/asm_pair-smds.coverage \
+		> $CONCOCT_INPUT/concoct_inputtable.tsv
+
+echo "generate linkage table"
+# generate linkage table
+
+	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/Sample*/bowtie2/asm_pair-smds.bam \
+		> $CONCOCT_INPUT/concoct_linkage.csv
+
+# concot
+
+	cut -f1,3- $CONCOCT_INPUT/concoct_inputtable.tsv > $CONCOCT_INPUT/concoct_inputtableR.tsv
+
+	concoct --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/con_out
+
+	python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/con_out_clustering* > $CONT_BINNING_FILE
+
+# classification
+#----------------
+
+#echo "#CAMI kraken binning: kmer size $KMER, minimizer $MINIMIZER\n\
+#@Version:0.9.0\n\
+#@@SEQUENCEID        TAXID" > $CONT_BINNING_FILE
+#
+#FASTA_FILES=$(cat $CONT_CONTIGS_FILE_LISTING | tr "\n" " ")
+
+#kraken --preload --threads $DCKR_THREADS -db $DB $FASTA_FILES | cut -f 2,3 | sed "s/\t0$/\t1/" >> $CONT_BINNING_FILE

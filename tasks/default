@@ -1,0 +1,83 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+
+# default settings
+#-----------------
+
+CONTIGS=$DCKR_CACHEDIR/contigs.fa
+CONTIGS_10K=$DCKR_CACHEDIR/contigs_10k.fa
+READS_R1=$DCKR_CACHEDIR/readsR1.fq
+READS_R2=$DCKR_CACHEDIR/readsR2.fq
+MAPPING_FOLDER=$DCKR_CACHEDIR/map
+CONCOCT_INPUT=$DCKR_CACHEDIR/con_in
+CONCOCT_OUTPUT=$DCKR_CACHEDIR/con_out
+SAMPLENAMES=$DCKR_CACHEDIR/samplenames.txt
+
+rm -rf $CONCOCT_INPUT
+rm -rf $CONCOCT_OUTPUT
+rm -rf $MAPPING_FOLDER
+
+mkdir $CONCOCT_INPUT
+mkdir $CONCOCT_OUTPUT
+mkdir $MAPPING_FOLDER
+mkdir $MAPPING_FOLDER/Sample
+
+echo "prepare input"
+for cfile in $(cat $CONT_CONTIGS_FILE_LISTING);do zcat $cfile > $CONTIGS;done
+ls -lah $CONTIGS
+for rfile in $(cat $CONT_PAIRED_FASTQ_FILE_LISTING);\
+	do\
+	zcat $rfile | python /scripts/read_splitter.py $READS_R1 $READS_R2;\
+	done
+
+echo "cut up contigs"
+# Cutting up contigs
+
+	python $CONCOCT/scripts/cut_up_fasta.py -c 10000 -o 0 -m $CONTIGS > $CONTIGS_10K 
+
+echo "map reads to contigs"
+# Map reads on contigs
+
+	bowtie2-build $CONTIGS_10K $CONTIGS_10K
+
+
+	bash $CONCOCT/scripts/map-bowtie2-markduplicates.sh -c -t $DCKR_THREADS -p '-q' $READS_R1 $READS_R2\
+					   pair $CONTIGS_10K asm $MAPPING_FOLDER/Sample/bowtie2;
+
+echo "generate coverage table"
+# generate coverage table
+	echo "Sample" > $SAMPLENAMES
+
+	python $CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.coverage \
+		> $CONCOCT_INPUT/concoct_inputtable.tsv
+
+echo "generate linkage table"
+# generate linkage table
+
+	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/Sample*/bowtie2/asm_pair-smds.bam \
+		> $CONCOCT_INPUT/concoct_linkage.csv
+
+echo "execute concoct"
+# concoct
+
+	cut -f1,3- $CONCOCT_INPUT/concoct_inputtable.tsv > $CONCOCT_INPUT/concoct_inputtableR.tsv
+
+	concoct --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
+
+# merge cutups by majority
+
+	python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/con_out_clustering* > $CONT_BINNING_FILE
+
+# classification
+#----------------
+
+#echo "#CAMI kraken binning: kmer size $KMER, minimizer $MINIMIZER\n\
+#@Version:0.9.0\n\
+#@@SEQUENCEID        TAXID" > $CONT_BINNING_FILE
+#
+#FASTA_FILES=$(cat $CONT_CONTIGS_FILE_LISTING | tr "\n" " ")
+
+#kraken --preload --threads $DCKR_THREADS -db $DB $FASTA_FILES | cut -f 2,3 | sed "s/\t0$/\t1/" >> $CONT_BINNING_FILE
