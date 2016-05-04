@@ -67,17 +67,11 @@ echo "execute concoct"
 
 	concoct --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
 
-# merge cutups by majority
+echo "generating output"
+# output
 
-	python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/con_out_clustering* > $CONT_BINNING_FILE
-
-# classification
-#----------------
-
-#echo "#CAMI kraken binning: kmer size $KMER, minimizer $MINIMIZER\n\
-#@Version:0.9.0\n\
-#@@SEQUENCEID        TAXID" > $CONT_BINNING_FILE
-#
-#FASTA_FILES=$(cat $CONT_CONTIGS_FILE_LISTING | tr "\n" " ")
-
-#kraken --preload --threads $DCKR_THREADS -db $DB $FASTA_FILES | cut -f 2,3 | sed "s/\t0$/\t1/" >> $CONT_BINNING_FILE
+echo "#CAMI concoct default\n\
+@SampleID:
+@Version:0.9.0\n\
+@@SEQUENCEID\tBINID" > $CONT_BINNING_FILE
+python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/clustering* | tr ',' '\t' >> $CONT_BINNING_FILE

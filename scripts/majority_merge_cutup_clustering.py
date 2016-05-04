@@ -28,7 +28,7 @@ def original_contig_name(s):
         return s
 
 def main(args):
-    df = pd.read_table(args.clustering, sep=',', header=False, names=["contig_id", "cluster_id"])
+    df = pd.read_table(args.clustering, sep=',', header=None, names=["contig_id", "cluster_id"])
     df['orig_contig_id'] = df.contig_id.apply(original_contig_name)
     majority_vote = {}
     for orig_contig_id, group_df in df.groupby('orig_contig_id'):
