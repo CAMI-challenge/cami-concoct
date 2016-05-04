@@ -71,7 +71,7 @@ echo "generating output"
 # output
 
 echo "#CAMI concoct default\n\
-@SampleID:
+@SampleID:\n\
 @Version:0.9.0\n\
 @@SEQUENCEID\tBINID" > $CONT_BINNING_FILE
 python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/clustering* | tr ',' '\t' >> $CONT_BINNING_FILE
