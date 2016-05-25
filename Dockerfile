@@ -14,15 +14,15 @@ MAINTAINER CONCOCT developer group, concoct-support@lists.sourceforge.net
 
 # Proxy settings. Comment out if not needed
 
-ENV MY_PROXY http://rzproxy.helmholtz-hzi.de:3128
-RUN echo 'Acquire::http::Proxy "'$MY_PROXY'";\nAcquire::ftp::Proxy "'$MY_PROXY'";\n' > /etc/apt/apt.conf.d/proxy
+#ENV MY_PROXY http://rzproxy.helmholtz-hzi.de:3128
+#RUN echo 'Acquire::http::Proxy "'$MY_PROXY'";\nAcquire::ftp::Proxy "'$MY_PROXY'";\n' > /etc/apt/apt.conf.d/proxy
 
-ENV http_proxy $MY_PROXY
-ENV https_proxy $MY_PROXY
-ENV ftp_proxy $MY_PROXY
-ENV HTTP_PROXY $MY_PROXY
-ENV HTTPS_PROXY $MY_PROXY
-ENV FTP_PROXY $MY_PROXY
+#ENV http_proxy $MY_PROXY
+#ENV https_proxy $MY_PROXY
+#ENV ftp_proxy $MY_PROXY
+#ENV HTTP_PROXY $MY_PROXY
+#ENV HTTPS_PROXY $MY_PROXY
+#ENV FTP_PROXY $MY_PROXY
 
 #---------------------------------------------------------------------------------------------------------------
 
@@ -30,18 +30,20 @@ ENV FTP_PROXY $MY_PROXY
 ENV PATH /opt/miniconda/bin:$PATH
 ENV PATH /opt/velvet_1.2.10:$PATH
 
+# apt-get
+RUN apt-get -qq update && apt-get install -qq -y --fix-missing -o DPkg::Options::=--force-confnew \
+apt-utils wget build-essential libgsl0-dev git zip unzip
+
 # Get basic ubuntu packages needed
-RUN apt-get update -qq
-RUN apt-get install -qq apt-utils
-RUN apt-get install -qq wget build-essential libgsl0-dev git zip unzip
+#RUN apt-get update -qq
+#RUN apt-get install -qq apt-utils
+#RUN apt-get install -qq wget build-essential libgsl0-dev git zip unzip
 
 # Set up Miniconda environment for python2
-RUN cd /opt;\
-    wget http://repo.continuum.io/miniconda/Miniconda-3.3.0-Linux-x86_64.sh -O miniconda.sh;\
-    chmod +x miniconda.sh;\
-    ./miniconda.sh -p /opt/miniconda -b;\
-    conda update --yes conda;\
-    conda install --yes python=2.7
+RUN wget http://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O /opt/miniconda.sh; chmod +x /opt/miniconda.sh;
+RUN /opt/miniconda.sh -p /opt/miniconda -b;
+RUN /opt/miniconda/bin/conda update --yes conda
+RUN /opt/miniconda/bin/conda install --yes python=2.7
 
 # Velvet for assembly
 RUN apt-get install -qq zlib1g-dev
@@ -52,14 +54,26 @@ RUN cd /opt;\
     sed -i "s/MAXKMERLENGTH=31/MAXKMERLENGTH=128/" Makefile ;\
     make
 
+RUN apt-get -qq update && apt-get install -qq -y --fix-missing -o DPkg::Options::=--force-confnew \
+bedtools \
+libfuse2 openjdk-7-jre-headless udev \
+samtools \
+bowtie2 \
+parallel \
+r-base git
+
+#RUN apt-get -qq install python
+
+
+
 # Bedtools2.17
-RUN apt-get install -qq bedtools
+#RUN apt-get install -qq bedtools
 
 # Picard tools 1.118
 # To get fuse to work, I need the following (Issue here: https://github.com/dotcloud/docker/issues/514,
 # solution here: https://gist.github.com/henrik-muehe/6155333).
 ENV MRKDUP /opt/picard-tools-1.118/MarkDuplicates.jar
-RUN apt-get install -qq libfuse2 openjdk-7-jre-headless udev
+#RUN apt-get install -qq libfuse2 openjdk-7-jre-headless udev
 RUN cd /tmp && apt-get download fuse && ls -a \
 && dpkg-deb -x fuse_* .\
 && dpkg-deb -e fuse_*\
@@ -72,13 +86,13 @@ RUN cd /tmp && apt-get download fuse && ls -a \
     && unzip picard-tools-1.118.zip
 
 # Samtools 0.1.19
-RUN apt-get install -qq samtools
+#RUN apt-get install -qq samtools
 
 # Bowtie2.1.0
-RUN apt-get install -qq bowtie2
+#RUN apt-get install -qq bowtie2
 
 # Parallel 20130622-1
-RUN apt-get install -qq parallel
+#RUN apt-get install -qq parallel
 
 
 
@@ -91,7 +105,7 @@ RUN cd /opt;\
     ln -s /opt/Prodigal-2.60/prodigal /bin/prodigal
 
 # Install R
-RUN apt-get install -qq r-base git
+#RUN apt-get install -qq r-base git
 
 # Install R packages
 RUN cd /opt;\
@@ -104,11 +118,13 @@ RUN cd /opt\
     && conda update --yes conda\
     && conda install --yes python=2.7 atlas cython numpy scipy biopython pandas pip scikit-learn pysam\
     && pip install bcbio-gff\
+    && pip install biopython\
     && git clone https://github.com/BinPro/CONCOCT \
-# && wget --no-check-certificate https://github.com/BinPro/CONCOCT/archive/0.4.1.tar.gz\
-# && tar xf 0.4.1.tar.gz\
     && cd CONCOCT\
     && python setup.py install
+
+# && wget --no-check-certificate https://github.com/BinPro/CONCOCT/archive/0.4.1.tar.gz\
+# && tar xf 0.4.1.tar.gz\
 
 ENV CONCOCT /opt/CONCOCT
 ENV CONCOCT_TEST /opt/Data/CONCOCT-test-data
