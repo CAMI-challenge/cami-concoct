@@ -9,8 +9,6 @@ set -o nounset
 
 CONTIGS=$DCKR_CACHEDIR/contigs.fa
 CONTIGS_10K=$DCKR_CACHEDIR/contigs_10k.fa
-READS_R1=$DCKR_CACHEDIR/readsR1.fq
-READS_R2=$DCKR_CACHEDIR/readsR2.fq
 MAPPING_FOLDER=$DCKR_CACHEDIR/map
 CONCOCT_INPUT=$DCKR_CACHEDIR/con_in
 CONCOCT_OUTPUT=$DCKR_CACHEDIR/con_out
@@ -19,37 +17,42 @@ SAMPLENAMES=$DCKR_CACHEDIR/samplenames.txt
 rm -rf $CONCOCT_INPUT
 rm -rf $CONCOCT_OUTPUT
 rm -rf $MAPPING_FOLDER
+rm -f "$SAMPLENAME"
 
 mkdir $CONCOCT_INPUT
 mkdir $CONCOCT_OUTPUT
 mkdir $MAPPING_FOLDER
-mkdir $MAPPING_FOLDER/Sample
+#mkdir $MAPPING_FOLDER/Sample
 
-echo "prepare input"
 for cfile in $(cat $CONT_CONTIGS_FILE_LISTING);do zcat $cfile > $CONTIGS;done
 ls -lah $CONTIGS
-for rfile in $(cat $CONT_PAIRED_FASTQ_FILE_LISTING);\
-	do\
-	zcat $rfile | python /scripts/read_splitter.py $READS_R1 $READS_R2;\
-	done
 
 echo "cut up contigs"
 # Cutting up contigs
+python $CONCOCT/scripts/cut_up_fasta.py -c 10000 -o 0 -m $CONTIGS > $CONTIGS_10K 
 
-	python $CONCOCT/scripts/cut_up_fasta.py -c 10000 -o 0 -m $CONTIGS > $CONTIGS_10K 
+echo "prepare input"
+bowtie2-build $CONTIGS_10K $CONTIGS_10K
 
-echo "map reads to contigs"
-# Map reads on contigs
-
-	bowtie2-build $CONTIGS_10K $CONTIGS_10K
-
+suffix_index=0
+for rfile in $(cat $CONT_PAIRED_FASTQ_FILE_LISTING);\
+do\
+	SAMPLENAME="sample${suffix_index}"
+	READS_R1="$DCKR_CACHEDIR/${SAMPLENAME}_R1.fq"
+	READS_R2="$DCKR_CACHEDIR/${SAMPLENAME}_R2.fq"
+	zcat $rfile | python /scripts/read_splitter.py $READS_R1 $READS_R2;\
+	echo "map reads to contigs: $rfile"
+	# Map reads on contigs
 
 	bash $CONCOCT/scripts/map-bowtie2-markduplicates.sh -c -t $DCKR_THREADS -p '-q' $READS_R1 $READS_R2\
-					   pair $CONTIGS_10K asm $MAPPING_FOLDER/Sample/bowtie2;
+					   pair $CONTIGS_10K asm $MAPPING_FOLDER/$SAMPLENAME/bowtie2;
+	echo "$SAMPLENAME" >> $SAMPLENAMES
+	suffix_index=$((suffix_index+1))
+done
+
 
 echo "generate coverage table"
 # generate coverage table
-	echo "Sample" > $SAMPLENAMES
 
 	python $CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.coverage \
 		> $CONCOCT_INPUT/concoct_inputtable.tsv
@@ -57,7 +60,7 @@ echo "generate coverage table"
 echo "generate linkage table"
 # generate linkage table
 
-	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/Sample*/bowtie2/asm_pair-smds.bam \
+	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.bam \
 		> $CONCOCT_INPUT/concoct_linkage.csv
 
 echo "execute concoct"
