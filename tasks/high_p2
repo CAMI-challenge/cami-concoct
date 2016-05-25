@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+
+# default settings
+#-----------------
+
+CONTIGS=$DCKR_CACHEDIR/contigs.fa
+CONTIGS_10K=$DCKR_CACHEDIR/contigs_10k.fa
+MAPPING_FOLDER=$DCKR_CACHEDIR/map
+CONCOCT_INPUT=$DCKR_CACHEDIR/con_in
+CONCOCT_OUTPUT=$DCKR_CACHEDIR/con_out
+SAMPLENAMES=$DCKR_CACHEDIR/samplenames.txt
+
+echo "execute concoct"
+# concoct
+
+        concoct -c 1200 --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
+
+echo "generating output"
+# output
+
+echo "#CAMI concoct default\n\
+@SampleID:\n\
+@Version:0.9.0\n\
+@@SEQUENCEID\tBINID" > $CONT_BINNING_FILE
+python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/clustering* | tr ',' '\t' >> $CONT_BINNING_FILE
+
