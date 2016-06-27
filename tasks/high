@@ -60,7 +60,7 @@ echo "generate coverage table"
 echo "generate linkage table"
 # generate linkage table
 
-	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.bam \
+	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --readlength 150 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.bam \
 		> $CONCOCT_INPUT/concoct_linkage.csv
 
 echo "execute concoct"

@@ -14,36 +14,42 @@ CONCOCT_INPUT=$DCKR_CACHEDIR/con_in
 CONCOCT_OUTPUT=$DCKR_CACHEDIR/con_out
 SAMPLENAMES=$DCKR_CACHEDIR/samplenames.txt
 
+# clean up previous run
 rm -rf $CONCOCT_INPUT
 rm -rf $CONCOCT_OUTPUT
 rm -rf $MAPPING_FOLDER
 rm -f "$SAMPLENAMES"
 
+# prepare folder structure
 mkdir $CONCOCT_INPUT
 mkdir $CONCOCT_OUTPUT
 mkdir $MAPPING_FOLDER
-#mkdir $MAPPING_FOLDER/Sample
 
+# There should be only one file path of a file in fasta format, containing contigs in this list.
+# In case the contigs are split into several files, they are concatinated.
 for cfile in $(cat $CONT_CONTIGS_FILE_LISTING);do zcat $cfile > $CONTIGS;done
 ls -lah $CONTIGS
 
 echo "cut up contigs"
-# Cutting up contigs
-python $CONCOCT/scripts/cut_up_fasta.py -c 10000 -o 0 -m $CONTIGS > $CONTIGS_10K 
+# Cutting up contigs into <=10k long sequences
+python $CONCOCT/scripts/cut_up_fasta.py -c 10000 -o 0 -m $CONTIGS > $CONTIGS_10K
 
 echo "prepare input"
 bowtie2-build $CONTIGS_10K $CONTIGS_10K
 
+# '$CONT_PAIRED_FASTQ_FILE_LISTING' contains a list of file paths of fastq formated files.
+# each file represents a sample.
 suffix_index=0
 for rfile in $(cat $CONT_PAIRED_FASTQ_FILE_LISTING);\
 do\
 	SAMPLENAME="sample${suffix_index}"
+	# split file containing both read pairs into two separate files
 	READS_R1="$DCKR_CACHEDIR/${SAMPLENAME}_R1.fq"
 	READS_R2="$DCKR_CACHEDIR/${SAMPLENAME}_R2.fq"
 	zcat $rfile | python /scripts/read_splitter.py $READS_R1 $READS_R2;\
+
 	echo "map reads to contigs: $rfile"
 	# Map reads on contigs
-
 	bash $CONCOCT/scripts/map-bowtie2-markduplicates.sh -c -t $DCKR_THREADS -p '-q' $READS_R1 $READS_R2\
 					   pair $CONTIGS_10K asm $MAPPING_FOLDER/$SAMPLENAME/bowtie2;
 	echo "$SAMPLENAME" >> $SAMPLENAMES
@@ -53,28 +59,24 @@ done
 
 echo "generate coverage table"
 # generate coverage table
-
-	python $CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.coverage \
+python $CONCOCT/scripts/gen_input_table.py --isbedfiles --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.coverage \
 		> $CONCOCT_INPUT/concoct_inputtable.tsv
 
 echo "generate linkage table"
 # generate linkage table
-
-	python $CONCOCT/scripts/bam_to_linkage.py -m 8 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.bam \
+# TODO: dynamically set -m maximum number of cores
+python $CONCOCT/scripts/bam_to_linkage.py -m 8 --readlength 150 --regionlength 500 --fullsearch --samplenames $SAMPLENAMES $CONTIGS_10K $MAPPING_FOLDER/*/bowtie2/asm_pair-smds.bam \
 		> $CONCOCT_INPUT/concoct_linkage.csv
 
 echo "execute concoct"
 # concoct
-
-	cut -f1,3- $CONCOCT_INPUT/concoct_inputtable.tsv > $CONCOCT_INPUT/concoct_inputtableR.tsv
-
-	concoct --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
+cut -f1,3- $CONCOCT_INPUT/concoct_inputtable.tsv > $CONCOCT_INPUT/concoct_inputtableR.tsv
+concoct --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
 
 echo "generating output"
 # output
-
 echo "#CAMI concoct default\n\
-@SampleID:\n\
+@SampleID:NA\n\
 @Version:0.9.0\n\
 @@SEQUENCEID\tBINID" > $CONT_BINNING_FILE
 python /scripts/majority_merge_cutup_clustering.py $CONCOCT_OUTPUT/clustering* | tr ',' '\t' >> $CONT_BINNING_FILE

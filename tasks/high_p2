@@ -16,8 +16,7 @@ SAMPLENAMES=$DCKR_CACHEDIR/samplenames.txt
 
 echo "execute concoct"
 # concoct
-
-        concoct -c 1200 --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
+concoct -c 1200 --coverage_file $CONCOCT_INPUT/concoct_inputtableR.tsv --composition_file $CONTIGS_10K -b $CONCOCT_OUTPUT/
 
 echo "generating output"
 # output
